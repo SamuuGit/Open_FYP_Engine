@@ -1,0 +1,557 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Open FYP Engine — Demonstração Funcional</title>
+  <style>
+    :root {
+      --bg-dark: #121212;
+      --card-bg: #1e1e1e;
+      --accent: #fe2c55;
+      --accent-cyan: #25f4ee;
+      --text-main: #ffffff;
+      --text-muted: #8a8b91;
+      --border: #2f2f2f;
+      --success: #00e676;
+      --warning: #ffab00;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
+    body { background: var(--bg-dark); color: var(--text-main); display: flex; height: 100vh; overflow: hidden; }
+
+    /* Lado Esquerdo: Player de Feed */
+    .feed-container {
+      width: 440px; min-width: 400px; height: 100%; border-right: 1px solid var(--border);
+      display: flex; flex-direction: column; align-items: center; justify-content: center;
+      background: #000; position: relative; padding: 20px;
+    }
+    .phone-frame {
+      width: 360px; height: 640px; border-radius: 28px; background: #161616; border: 4px solid #333;
+      position: relative; overflow: hidden; display: flex; flex-direction: column; box-shadow: 0 10px 40px rgba(0,0,0,0.8);
+    }
+    .video-canvas {
+      flex: 1; display: flex; flex-direction: column; justify-content: space-between; padding: 24px 18px;
+      position: relative; background: linear-gradient(135deg, #1f2937, #111827); transition: background 0.4s;
+    }
+    .top-bar { display: flex; justify-content: space-between; font-size: 13px; font-weight: 600; }
+    .badge { padding: 4px 10px; border-radius: 12px; font-size: 11px; text-transform: uppercase; font-weight: 700; }
+    .badge-category { background: rgba(254, 44, 85, 0.2); color: var(--accent); border: 1px solid var(--accent); }
+    .badge-skip { background: rgba(255, 171, 0, 0.2); color: var(--warning); border: 1px solid var(--warning); transition: 0.3s; }
+    .badge-skip.ok { background: rgba(0, 230, 118, 0.2); color: var(--success); border-color: var(--success); }
+
+    .video-meta { margin-bottom: 20px; z-index: 2; }
+    .author-name { font-size: 16px; font-weight: 700; margin-bottom: 6px; color: #fff; }
+    .video-title { font-size: 14px; line-height: 1.4; color: #e1e1e1; margin-bottom: 12px; }
+
+    .progress-bar-container { width: 100%; height: 4px; background: rgba(255,255,255,0.2); border-radius: 2px; overflow: hidden; margin-top: 10px; }
+    .progress-bar { height: 100%; width: 0%; background: var(--accent); transition: width 0.1s linear; }
+
+    /* Botões Flutuantes no Vídeo */
+    .action-rail { position: absolute; right: 12px; bottom: 80px; display: flex; flex-direction: column; gap: 16px; z-index: 3; }
+    .btn-action {
+      background: rgba(40,40,40,0.8); border: 1px solid rgba(255,255,255,0.1); width: 46px; height: 46px;
+      border-radius: 50%; color: #fff; font-size: 18px; cursor: pointer; display: flex; flex-direction: column;
+      align-items: center; justify-content: center; transition: all 0.2s;
+    }
+    .btn-action:hover { transform: scale(1.1); background: rgba(60,60,60,0.9); }
+    .btn-action.active { background: var(--accent); border-color: var(--accent); }
+    .btn-action span { font-size: 10px; margin-top: 2px; }
+
+    /* Controles do Feed */
+    .feed-controls { display: flex; gap: 12px; margin-top: 16px; }
+    .btn-nav {
+      background: var(--card-bg); color: #fff; border: 1px solid var(--border); padding: 10px 18px;
+      border-radius: 8px; font-size: 13px; font-weight: 600; cursor: pointer; transition: 0.2s;
+    }
+    .btn-nav:hover { background: #2a2a2a; border-color: var(--accent); }
+
+    /* Lado Direito: Telemetria & Cérebro do Algoritmo */
+    .dashboard { flex: 1; height: 100%; overflow-y: auto; padding: 28px; background: var(--bg-dark); }
+    .dash-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px; border-bottom: 1px solid var(--border); padding-bottom: 16px; }
+    .dash-header h1 { font-size: 20px; font-weight: 700; display: flex; align-items: center; gap: 10px; }
+    .status-pill { font-size: 12px; padding: 4px 10px; border-radius: 20px; background: #1c2a1f; color: var(--success); border: 1px solid var(--success); }
+
+    .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-bottom: 20px; }
+    .card { background: var(--card-bg); border: 1px solid var(--border); border-radius: 12px; padding: 18px; }
+    .card-title { font-size: 14px; font-weight: 700; color: var(--accent-cyan); margin-bottom: 14px; display: flex; align-items: center; justify-content: space-between; }
+
+    /* Métricas em Tempo Real */
+    .stat-row { display: flex; justify-content: space-between; margin-bottom: 10px; font-size: 13px; }
+    .stat-label { color: var(--text-muted); }
+    .stat-value { font-weight: 600; font-family: monospace; }
+    .highlight-red { color: #ff5252; }
+    .highlight-green { color: var(--success); }
+
+    /* Gráfico de Afinidade */
+    .affinity-bar { margin-bottom: 12px; }
+    .affinity-meta { display: flex; justify-content: space-between; font-size: 12px; margin-bottom: 4px; }
+    .affinity-track { height: 8px; background: #2a2a2a; border-radius: 4px; overflow: hidden; }
+    .affinity-fill { height: 100%; border-radius: 4px; transition: width 0.3s ease; }
+
+    /* Tabela do Bloco de Notas (Últimos vídeos) */
+    table { width: 100%; border-collapse: collapse; font-size: 12px; text-align: left; margin-top: 8px; }
+    th { color: var(--text-muted); padding: 8px 6px; border-bottom: 1px solid var(--border); }
+    td { padding: 8px 6px; border-bottom: 1px solid rgba(255,255,255,0.05); font-family: monospace; }
+
+    /* Badge flags */
+    .flag-tag { font-size: 10px; padding: 2px 6px; border-radius: 4px; font-weight: 700; margin-right: 4px; }
+    .tag-skip { background: rgba(255, 82, 82, 0.2); color: #ff5252; }
+    .tag-ok { background: rgba(0, 230, 118, 0.2); color: var(--success); }
+    .tag-like { background: rgba(254, 44, 85, 0.2); color: var(--accent); }
+    .tag-fin { background: rgba(37, 244, 238, 0.2); color: var(--accent-cyan); }
+  </style>
+</head>
+<body>
+
+  <!-- Lado Esquerdo: Player Interativo estilo TikTok -->
+  <div class="feed-container">
+    <div class="phone-frame">
+      <div class="video-canvas" id="videoCanvas">
+        <div class="top-bar">
+          <span class="badge badge-category" id="badgeCategory">TECNOLOGIA</span>
+          <span class="badge badge-skip" id="badgeSkipRule">TEMPO: 0.0s (PULO ATIVO)</span>
+        </div>
+
+        <div class="action-rail">
+          <button class="btn-action" id="btnLike" onclick="toggleAction('like')">
+            ❤️ <span id="lblLike">0</span>
+          </button>
+          <button class="btn-action" id="btnFavorite" onclick="toggleAction('favorite')">
+            ⭐ <span>Salvar</span>
+          </button>
+          <button class="btn-action" id="btnComment" onclick="toggleAction('comment')">
+            💬 <span>Coment</span>
+          </button>
+          <button class="btn-action" id="btnDislike" onclick="toggleAction('dislike')">
+            🚫 <span>Não</span>
+          </button>
+        </div>
+
+        <div class="video-meta">
+          <div class="author-name" id="authorName">@dev_brasil</div>
+          <div class="video-title" id="videoTitle">Carregando feed de recomendações...</div>
+          <div class="stat-row" style="margin-top: 4px; font-size: 11px;">
+            <span class="stat-label">Duração: <span id="timerText">0s / 15s</span></span>
+            <span class="stat-label">Índice: <span id="feedIndexText">1 de 6</span></span>
+          </div>
+          <div class="progress-bar-container">
+            <div class="progress-bar" id="progressBar"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="feed-controls">
+      <button class="btn-nav" onclick="prevVideo()">⬆ Vídeo Anterior</button>
+      <button class="btn-nav" onclick="togglePlayPause()" id="btnPlayPause">⏸ Pausar</button>
+      <button class="btn-nav" style="background: var(--accent); border-color: var(--accent);" onclick="nextVideo('slide')">⬇ Próximo Vídeo</button>
+    </div>
+    <div style="font-size: 11px; color: var(--text-muted); margin-top: 10px;">
+      Dica: Você também pode usar as setas <b>↑ / ↓</b> ou a <b>roda do mouse</b>.
+    </div>
+  </div>
+
+  <!-- Lado Direito: Dashboard de Sinais em Tempo Real e Algoritmo -->
+  <div class="dashboard">
+    <div class="dash-header">
+      <div>
+        <h1>🧠 Open FYP — Telemetria & Motor de Recomendação</h1>
+        <p style="font-size: 13px; color: var(--text-muted); margin-top: 4px;">
+          Painel de inspeção transparente da comunicação cliente-servidor em tempo real.
+        </p>
+      </div>
+      <div class="status-pill" id="focusPill">● JANELA EM FOCO (foco_ativo: SIM)</div>
+    </div>
+
+    <div class="grid-2">
+      <!-- Card: Regra dos 2 Segundos e Sinais do Vídeo Atual -->
+      <div class="card">
+        <div class="card-title">
+          <span>⏱️ SINAIS DO VÍDEO ATUAL</span>
+          <span style="font-size: 11px; color: var(--text-muted);">Canal 1 (In-Band)</span>
+        </div>
+        <div class="stat-row">
+          <span class="stat-label">Tempo assistido (playtime):</span>
+          <span class="stat-value" id="valPlaytime">0 ms</span>
+        </div>
+        <div class="stat-row">
+          <span class="stat-label">Tempo com foco na janela (focus_time):</span>
+          <span class="stat-value" id="valFocusTime">0 ms</span>
+        </div>
+        <div class="stat-row">
+          <span class="stat-label">Regra dos 2 Segundos (is_skipped):</span>
+          <span class="stat-value highlight-red" id="valIsSkipped">1 (PULADO SE PASSAR AGORA)</span>
+        </div>
+        <div class="stat-row">
+          <span class="stat-label">Concluído / Replay (is_finished):</span>
+          <span class="stat-value" id="valIsFinished">0</span>
+        </div>
+        <div class="stat-row">
+          <span class="stat-label">Qualidade de Stream Adaptativa:</span>
+          <span class="stat-value highlight-green" id="valStreamProfile">1080p (2800 kbps)</span>
+        </div>
+      </div>
+
+      <!-- Card: Afinidade e Ranking no Servidor -->
+      <div class="card">
+        <div class="card-title">
+          <span>📊 AFINIDADE CALCULADA PELO SERVIDOR</span>
+          <span style="font-size: 11px; color: var(--text-muted);">Pesos em Tempo Real</span>
+        </div>
+        <div id="affinityContainer">
+          <!-- Barras de afinidade geradas dinamicamente -->
+        </div>
+      </div>
+    </div>
+
+    <!-- Bloco de Notas Invisível: Janela dos Últimos Vídeos -->
+    <div class="card">
+      <div class="card-title">
+        <span>📋 "BLOCO DE NOTAS INVISÍVEL" (JANELA DOS ÚLTIMOS VÍDEOS NO CLIENTE)</span>
+        <span style="font-size: 11px; color: var(--accent-cyan);" id="lblPayloadInfo">Preparado para envio (Gzip)</span>
+      </div>
+      <p style="font-size: 12px; color: var(--text-muted); margin-bottom: 10px;">
+        Esta tabela representa o histórico que o cliente empacota com <b>Gzip</b> e envia no corpo de <code>POST /api/recommend/item_list/</code> a cada novo lote.
+      </p>
+      <table>
+        <thead>
+          <tr>
+            <th>ID</th>
+            <th>Categoria</th>
+            <th>Tempo (ms)</th>
+            <th>Status</th>
+            <th>Flags Ativas</th>
+            <th>Pontuação</th>
+          </tr>
+        </thead>
+        <tbody id="tblHistoryBody">
+          <tr><td colspan="6" style="text-align:center; color: var(--text-muted);">Nenhum vídeo concluído ainda.</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <script type="module">
+    // Estado local do aplicativo cliente
+    let currentFeed = [];
+    let currentIndex = 0;
+    let videoWatchStart = Date.now();
+    let videoFocusTime = 0;
+    let isPlaying = true;
+    let isWindowActive = true;
+    let playbackInterval = null;
+    let categoryAffinities = { tecnologia: 1.0, culinaria: 1.0, esportes: 1.0, ciencia: 1.0, musica: 1.0, humor: 1.0 };
+    let consumptionHistory = [];
+
+    // Estado do vídeo atual
+    let currentVideoState = {
+      is_liked: 0,
+      is_favorited: 0,
+      is_commentted: 0,
+      is_disliked: 0,
+      is_finished: 0,
+    };
+
+    const gradientPresets = [
+      'linear-gradient(135deg, #0f172a, #1e1b4b)',
+      'linear-gradient(135deg, #1c1917, #3b0764)',
+      'linear-gradient(135deg, #042f2e, #134e4a)',
+      'linear-gradient(135deg, #31101e, #18181b)',
+      'linear-gradient(135deg, #1e293b, #0f766e)'
+    ];
+
+    // Inicialização
+    async function init() {
+      setupWindowFocusListeners();
+      await fetchFeedBatch(true);
+      loadVideo(0);
+      renderAffinityBars();
+    }
+
+    function setupWindowFocusListeners() {
+      window.addEventListener('focus', () => {
+        isWindowActive = true;
+        document.getElementById('focusPill').className = 'status-pill';
+        document.getElementById('focusPill').textContent = '● JANELA EM FOCO (foco_ativo: SIM)';
+      });
+      window.addEventListener('blur', () => {
+        isWindowActive = false;
+        document.getElementById('focusPill').className = 'status-pill';
+        document.getElementById('focusPill').style.borderColor = '#ff5252';
+        document.getElementById('focusPill').style.color = '#ff5252';
+        document.getElementById('focusPill').textContent = '⏸ JANELA SEM FOCO (foco_time pausado)';
+      });
+
+      // Suporte a teclas de seta
+      window.addEventListener('keydown', (e) => {
+        if (e.key === 'ArrowDown') nextVideo('keyboard');
+        if (e.key === 'ArrowUp') prevVideo();
+        if (e.key === ' ') togglePlayPause();
+      });
+
+      // Suporte à roda do mouse
+      let wheelTimeout = null;
+      window.addEventListener('wheel', (e) => {
+        if (wheelTimeout) return;
+        if (e.deltaY > 40) {
+          nextVideo('slide');
+          wheelTimeout = setTimeout(() => { wheelTimeout = null; }, 600);
+        } else if (e.deltaY < -40) {
+          prevVideo();
+          wheelTimeout = setTimeout(() => { wheelTimeout = null; }, 600);
+        }
+      });
+    }
+
+    async function fetchFeedBatch(isInitial = false) {
+      const itemsToSend = consumptionHistory
+        .filter(i => i.playtime > 0)
+        .slice(-16);
+
+      const payload = {
+        realTimeClientInfo: {
+          consumption_data: {
+            consumption_items: itemsToSend,
+            batch_num: isInitial ? 1 : 2,
+          }
+        }
+      };
+
+      try {
+        const res = await fetch(`/api/recommend/item_list/?count=${isInitial ? 6 : 10}&pullType=${isInitial ? 1 : 2}`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload),
+        });
+        const data = await res.json();
+        if (data.categoryAffinity) {
+          categoryAffinities = data.categoryAffinity;
+          renderAffinityBars();
+        }
+        if (data.itemList) {
+          if (isInitial) {
+            currentFeed = data.itemList;
+          } else {
+            currentFeed.push(...data.itemList);
+          }
+          document.getElementById('lblPayloadInfo').textContent = `Servidor atualizou ranking! Próximos: ${currentFeed.length} vídeos.`;
+        }
+      } catch (err) {
+        console.error('Erro ao buscar feed:', err);
+      }
+    }
+
+    function loadVideo(index) {
+      if (!currentFeed[index]) return;
+      currentIndex = index;
+      const video = currentFeed[index];
+
+      // Reinicia métricas do vídeo
+      videoWatchStart = Date.now();
+      videoFocusTime = 0;
+      currentVideoState = {
+        is_liked: 0,
+        is_favorited: 0,
+        is_commentted: 0,
+        is_disliked: 0,
+        is_finished: 0,
+      };
+
+      // Reseta botões
+      ['btnLike', 'btnFavorite', 'btnComment', 'btnDislike'].forEach(id => {
+        document.getElementById(id).classList.remove('active');
+      });
+
+      // Atualiza interface
+      document.getElementById('videoCanvas').style.background = gradientPresets[index % gradientPresets.length];
+      document.getElementById('badgeCategory').textContent = video.category.toUpperCase();
+      document.getElementById('authorName').textContent = video.author;
+      document.getElementById('videoTitle').textContent = video.title;
+      document.getElementById('feedIndexText').textContent = `${index + 1} de ${currentFeed.length}`;
+
+      if (playbackInterval) clearInterval(playbackInterval);
+      startPlaybackTimer(video);
+
+      // Gatilho de pré-busca (se estiver na metade do lote)
+      if (index === Math.floor(currentFeed.length / 2)) {
+        document.getElementById('lblPayloadInfo').textContent = '⚡ Disparando pré-busca (prefetch) de mais vídeos...';
+        fetchFeedBatch(false);
+      }
+    }
+
+    function startPlaybackTimer(video) {
+      const durationMs = video.durationMs || 15000;
+      playbackInterval = setInterval(() => {
+        if (!isPlaying) return;
+
+        const now = Date.now();
+        const elapsed = now - videoWatchStart;
+        if (isWindowActive) {
+          videoFocusTime += 100;
+        }
+
+        const pct = Math.min(100, (elapsed / durationMs) * 100);
+        document.getElementById('progressBar').style.width = `${pct}%`;
+        document.getElementById('timerText').textContent = `${(elapsed / 1000).toFixed(1)}s / ${(durationMs / 1000).toFixed(0)}s`;
+
+        // Regra dos 2 Segundos
+        const isSkipped = (elapsed > 0 && elapsed < 2000) ? 1 : 0;
+        const badgeSkip = document.getElementById('badgeSkipRule');
+        if (isSkipped) {
+          badgeSkip.className = 'badge badge-skip';
+          badgeSkip.textContent = `TEMPO: ${(elapsed / 1000).toFixed(1)}s (PULO ATIVO < 2s)`;
+          document.getElementById('valIsSkipped').className = 'stat-value highlight-red';
+          document.getElementById('valIsSkipped').textContent = '1 (PULADO SE PASSAR AGORA)';
+        } else {
+          badgeSkip.className = 'badge badge-skip ok';
+          badgeSkip.textContent = `TEMPO: ${(elapsed / 1000).toFixed(1)}s (ENGAJAMENTO VÁLIDO)`;
+          document.getElementById('valIsSkipped').className = 'stat-value highlight-green';
+          document.getElementById('valIsSkipped').textContent = '0 (CONSIDERADO INTERESSANTE)';
+        }
+
+        document.getElementById('valPlaytime').textContent = `${elapsed} ms`;
+        document.getElementById('valFocusTime').textContent = `${videoFocusTime} ms`;
+
+        // Fim do vídeo (100% -> replay)
+        if (elapsed >= durationMs && currentVideoState.is_finished === 0) {
+          currentVideoState.is_finished = 1;
+          document.getElementById('valIsFinished').textContent = '1 (ASSISTIDO 100% / REPLAY)';
+        }
+      }, 100);
+    }
+
+    window.toggleAction = function(action) {
+      if (action === 'like') {
+        currentVideoState.is_liked = currentVideoState.is_liked ? 0 : 1;
+        document.getElementById('btnLike').classList.toggle('active', currentVideoState.is_liked === 1);
+      } else if (action === 'favorite') {
+        currentVideoState.is_favorited = currentVideoState.is_favorited ? 0 : 1;
+        document.getElementById('btnFavorite').classList.toggle('active', currentVideoState.is_favorited === 1);
+      } else if (action === 'comment') {
+        currentVideoState.is_commentted = currentVideoState.is_commentted ? 0 : 1;
+        document.getElementById('btnComment').classList.toggle('active', currentVideoState.is_commentted === 1);
+      } else if (action === 'dislike') {
+        currentVideoState.is_disliked = currentVideoState.is_disliked ? 0 : 1;
+        document.getElementById('btnDislike').classList.toggle('active', currentVideoState.is_disliked === 1);
+      }
+    };
+
+    window.togglePlayPause = function() {
+      isPlaying = !isPlaying;
+      document.getElementById('btnPlayPause').textContent = isPlaying ? '⏸ Pausar' : '▶ Reproduzir';
+    };
+
+    window.nextVideo = function(scrollMethod = 'slide') {
+      finalizeCurrentVideo();
+      if (currentIndex + 1 < currentFeed.length) {
+        loadVideo(currentIndex + 1);
+      } else {
+        fetchFeedBatch(false).then(() => loadVideo(currentIndex + 1));
+      }
+    };
+
+    window.prevVideo = function() {
+      if (currentIndex > 0) {
+        finalizeCurrentVideo();
+        loadVideo(currentIndex - 1);
+      }
+    };
+
+    function finalizeCurrentVideo() {
+      if (!currentFeed[currentIndex]) return;
+      const video = currentFeed[currentIndex];
+      const elapsed = Date.now() - videoWatchStart;
+      const isSkipped = (elapsed > 0 && elapsed < 2000) ? 1 : 0;
+
+      const record = {
+        id: video.id,
+        category: video.category,
+        playtime: elapsed,
+        focus_time: videoFocusTime,
+        is_skipped: isSkipped,
+        is_finished: currentVideoState.is_finished,
+        is_liked: currentVideoState.is_liked,
+        is_favorited: currentVideoState.is_favorited,
+        is_disliked: currentVideoState.is_disliked,
+        is_commentted: currentVideoState.is_commentted,
+      };
+
+      consumptionHistory.push(record);
+      if (consumptionHistory.length > 20) {
+        consumptionHistory.shift(); // Janela máxima de 20 itens
+      }
+
+      renderHistoryTable();
+    }
+
+    function renderHistoryTable() {
+      const tbody = document.getElementById('tblHistoryBody');
+      tbody.innerHTML = '';
+
+      [...consumptionHistory].reverse().forEach(item => {
+        const tr = document.createElement('tr');
+        const flags = [];
+        if (item.is_skipped) flags.push('<span class="flag-tag tag-skip">PULADO &lt;2s</span>');
+        if (item.is_finished) flags.push('<span class="flag-tag tag-fin">100% VISTO</span>');
+        if (item.is_liked) flags.push('<span class="flag-tag tag-like">❤️ CURTIU</span>');
+        if (item.is_favorited) flags.push('<span class="flag-tag tag-like">⭐ SALVOU</span>');
+        if (item.is_disliked) flags.push('<span class="flag-tag tag-skip">🚫 NÃO QUER</span>');
+
+        // Cálculo de pontuação demonstrativo
+        let score = (item.playtime / 1000) * 0.35;
+        if (item.is_skipped) score -= 4.5;
+        if (item.is_disliked) score -= 10.0;
+        if (item.is_finished) score += 5.0;
+        if (item.is_liked) score += 4.0;
+        if (item.is_favorited) score += 6.0;
+
+        tr.innerHTML = `
+          <td style="font-weight:700;">${item.id}</td>
+          <td>${item.category}</td>
+          <td>${item.playtime}ms</td>
+          <td>${item.is_skipped ? 'Pulado' : 'Assistido'}</td>
+          <td>${flags.join('') || '<span style="color:#666;">nenhuma</span>'}</td>
+          <td style="color: ${score >= 0 ? '#00e676' : '#ff5252'}; font-weight:700;">
+            ${score >= 0 ? '+' : ''}${score.toFixed(1)}
+          </td>
+        `;
+        tbody.appendChild(tr);
+      });
+    }
+
+    function renderAffinityBars() {
+      const container = document.getElementById('affinityContainer');
+      container.innerHTML = '';
+      const colors = {
+        tecnologia: '#25f4ee',
+        ciencia: '#00e676',
+        culinaria: '#ffab00',
+        esportes: '#ff5252',
+        musica: '#a855f7',
+        humor: '#ec4899',
+      };
+
+      Object.entries(categoryAffinities).forEach(([cat, val]) => {
+        const score = Number(val);
+        const normWidth = Math.max(5, Math.min(100, ((score + 15) / 40) * 100));
+        const color = colors[cat] || '#fe2c55';
+
+        const div = document.createElement('div');
+        div.className = 'affinity-bar';
+        div.innerHTML = `
+          <div class="affinity-meta">
+            <span style="text-transform: capitalize; font-weight:600;">${cat}</span>
+            <span style="font-family: monospace; font-weight:700; color: ${color};">${score >= 0 ? '+' : ''}${score.toFixed(1)}</span>
+          </div>
+          <div class="affinity-track">
+            <div class="affinity-fill" style="width: ${normWidth}%; background: ${color};"></div>
+          </div>
+        `;
+        container.appendChild(div);
+      });
+    }
+
+    init();
+  </script>
+</body>
+</html>

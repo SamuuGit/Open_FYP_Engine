@@ -1,0 +1,21 @@
+{
+  "name": "open-fyp-signal-engine",
+  "version": "1.0.0",
+  "description": "Replicação clean-room em código aberto (MIT) da arquitetura de coleta de sinais em tempo real, telemetria em duplo canal e pré-busca de recomendações do feed Para Você (For You).",
+  "type": "module",
+  "main": "src/index.js",
+  "scripts": {
+    "start": "node src/server/httpServer.js",
+    "demo": "node examples/runSimulation.js",
+    "test": "node --test tests/signalEngine.test.js"
+  },
+  "keywords": [
+    "recommendation-system",
+    "real-time-signals",
+    "telemetry",
+    "for-you-feed",
+    "open-source",
+    "clean-room"
+  ],
+  "license": "MIT"
+}
