@@ -1,4 +1,4 @@
-# Engine Open Source FYP (MIT)
+# Open FYP Engine (MIT)
 
 Replicação *clean-room* em código aberto (licença MIT) da arquitetura de coleta de sinais de engajamento em tempo real, telemetria em duplo canal e pré-busca do feed **"Para Você" (*For You*)** mapeada na análise de engenharia reversa.
 
